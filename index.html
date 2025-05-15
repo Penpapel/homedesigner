@@ -27,26 +27,32 @@
       width: 100%;
       background: #1e1e1e;
       border-top: 1px solid #333;
-      padding: 10px;
+      padding: 15px;
       box-sizing: border-box;
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
+      gap: 12px;
     }
     select, button {
-      padding: 10px;
-      font-size: 14px;
+      padding: 14px;
+      font-size: 18px;
       background: #2a2a2a;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: 8px;
       flex: 1;
     }
     @media (max-width: 600px) {
       #form {
         flex-direction: column;
-        gap: 8px;
+        gap: 12px;
       }
+      select, button {
+        width: 100%;
+        font-size: 18px;
+        padding: 16px;
+      }
+    }
       select, button {
         width: 100%;
       }
