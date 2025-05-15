@@ -195,6 +195,12 @@ rooms.push({ name: finalName, parent, value: size, features: [] });
             <button id="closeModal">Cancel</button>
           `;
           document.body.appendChild(modal);
+          const input = document.getElementById('customFeature');
+          if (input) {
+            input.addEventListener('focus', () => {
+              modal.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            });
+          }
           document.body.style.height = 'auto'; // allow resize for keyboard
 
           document.getElementById('closeModal').onclick = () => {
