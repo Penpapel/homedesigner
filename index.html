@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Interactive Room Planner</title>
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      background: #121212;
+      color: white;
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    #treemap {
+      width: 100%;
+      height: calc(100% - 180px);
+      margin-top: 10px;
+    }
+    #form {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      background: #1e1e1e;
+      border-top: 1px solid #333;
+      padding: 10px;
+      box-sizing: border-box;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    select, button {
+      padding: 10px;
+      font-size: 14px;
+      background: #2a2a2a;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      flex: 1;
+    }
+    @media (max-width: 600px) {
+      #form {
+        flex-direction: column;
+        gap: 8px;
+      }
+      select, button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; background: #1e1e1e; border-bottom: 1px solid #333; font-size: 18px;">
+    <div><strong>My Home</strong></div>
+    <div id="sqftCounter">0 sqft</div>
+  </div>
+  <div id="treemap"></div>
+  <div id="form">
+    <select id="roomName">
+      <option disabled selected>Select Room</option>
+      <option value="Living Room">Living Room</option>
+      <option value="Kitchen">Kitchen</option>
+      <option value="Bedroom">Bedroom</option>
+      <option value="Bathroom">Bathroom</option>
+      <option value="Garage">Garage</option>
+    </select>
+    <select id="roomSize">
+      <option disabled selected>Select Size</option>
+      <option value="200">Compact</option>
+      <option value="350">Average</option>
+      <option value="500">Spacious</option>
+    </select>
+    <select id="parentRoom">
+      <option value="">(no parent)</option>
+    </select>
+    <button onclick="addRoom()">+</button>
+  </div>
+
+  <script>
+    const rooms = [];
+
+    const featureMap = {
+      'Living Room': ['Add Seating Area', 'Entertainment Setup'],
+      'Kitchen': ['Add Appliances', 'Pantry Space'],
+      'Bedroom': ['Add Closet', 'Bed Placement'],
+      'Bathroom': ['Add Shower', 'Vanity Area'],
+      'Garage': ['Vehicle Slot', 'Storage Shelves']
+    };
+
+    function addRoom() {
+      const name = document.getElementById('roomName').value;
+      const size = parseInt(document.getElementById('roomSize').value);
+      const parent = document.getElementById('parentRoom').value;
+      if (!name || isNaN(size)) return;
+
+      if (parent) {
+        const hostRoom = rooms.find(r => r.name === parent);
+        const totalExisting = rooms
+          .filter(r => r.parent === parent)
+          .reduce((sum, r) => sum + r.value, 0);
+
+        if (hostRoom.value > 0 && totalExisting + size > hostRoom.value) {
+          alert(`Error: Cannot add ${size} sqft to ${parent}. It exceeds available space (${hostRoom.value - totalExisting} sqft left).`);
+          return;
+        }
+      }
+
+      let finalName = name;
+let count = 1;
+while (rooms.some(r => r.name === finalName)) {
+  finalName = `${name} ${++count}`;
+}
+
+rooms.push({ name: finalName, parent, value: size, features: [] });
+
+      const parentList = document.getElementById('parentRoom');
+      if (![...parentList.options].some(opt => opt.value === finalName)) {
+  const opt = document.createElement('option');
+  opt.value = finalName;
+  opt.textContent = finalName;
+  parentList.appendChild(opt);
+}
+
+      updateTreemap();
+    }
+
+    function updateTreemap() {
+      const totalSqft = rooms.reduce((sum, r) => sum + r.value, 0);
+      document.getElementById('sqftCounter').textContent = `${totalSqft} sqft`;
+      Plotly.newPlot('treemap', [{
+        type: 'treemap',
+        labels: rooms.flatMap(r => [r.name, ...r.features]),
+        parents: rooms.flatMap(r => [r.parent, ...r.features.map(() => r.name)]),
+        values: rooms.flatMap(r => [r.value, ...r.features.map(() => Math.round(r.value / (r.features.length || 1)))]),
+        text: rooms.flatMap(r => [r.name, ...r.features]),
+        textinfo: 'text+value',
+        marker: {
+          colors: rooms.flatMap(r => ['#1E3A8A', ...r.features.map((_, j) => ['#2563EB', '#3B82F6', '#60A5FA'][j % 3])]),
+          line: { width: 2, color: '#fff' }
+        }
+      }], {
+        paper_bgcolor: '#121212',
+        plot_bgcolor: '#121212',
+        font: { color: '#fff' },
+        margin: { t: 30, l: 0, r: 0, b: 0 }
+      }).then(plot => {
+        plot.on('plotly_click', function(data) {
+          const label = data.points[0].label;
+          const clickedRoom = rooms.find(r => r.name === label);
+          if (!clickedRoom) return;
+
+          const existingCustom = clickedRoom.features.filter(f => !Object.values(featureMap).flat().includes(f));
+          const available = featureMap[clickedRoom.name] || [];
+          const featureHTML = available.map(f =>
+            `<label><input type="checkbox" value="${f}" ${clickedRoom.features.includes(f) ? 'checked' : ''}> ${f}</label><br>`
+          ).join('') +
+          existingCustom.map(f =>
+            `<label><input type="checkbox" value="${f}" checked> ${f}</label><br>`
+          ).join('') +
+          '<label><input type="checkbox" id="customFeatureToggle"> <input id="customFeature" placeholder="Add custom feature..." style="padding: 6px; width: 80%; background: #2a2a2a; color: white; border: none; border-radius: 4px;"></label>';
+
+          const oldModal = document.getElementById('featureModal');
+          if (oldModal) oldModal.remove();
+
+          const modal = document.createElement('div');
+          modal.id = 'featureModal';
+          modal.style.cssText = `
+            position: absolute; top: 100px; left: 10px;
+            background: #1e1e1e; color: white; padding: 20px;
+            border: 1px solid #555; z-index: 1000; border-radius: 8px;
+          `;
+          modal.innerHTML = `
+            <strong>Features for ${label}</strong><br><br>
+            ${featureHTML}<br>
+            <label style="display: flex; align-items: center; gap: 5px;">
+  Size:
+  <button id="decreaseSize" style="padding: 4px 8px;">◀</button>
+  <input id="sizeInput" value="${['Compact','Average','Spacious'][[200,350,500].indexOf(clickedRoom.value)] || clickedRoom.value}" readonly data-size="${clickedRoom.value}" style="padding: 5px; width: 100px; background: #2a2a2a; color: white; border: none; border-radius: 4px; text-align: center;">
+  <button id="increaseSize" style="padding: 4px 8px;">▶</button>
+</label><br><br>
+            <button id="deleteRoom" style="background: #c0392b;">Delete Room</button>
+            <button id="saveFeatures">Save</button>
+            <button id="closeModal">Cancel</button>
+          `;
+          document.body.appendChild(modal);
+
+          document.getElementById('closeModal').onclick = () => {
+            modal.remove();
+        };
+
+        document.getElementById('deleteRoom').onclick = () => {
+            const index = rooms.findIndex(r => r.name === clickedRoom.name);
+            if (index !== -1) rooms.splice(index, 1);
+            modal.remove();
+            updateTreemap();
+        };
+
+          document.getElementById('increaseSize').onclick = () => {
+            const input = document.getElementById('sizeInput');
+            const stdSizes = [200, 350, 500];
+            const labels = ['Compact', 'Average', 'Spacious'];
+            let current = stdSizes.indexOf(parseInt(input.dataset.size));
+            if (current === -1) current = stdSizes.indexOf(clickedRoom.value);
+            let next = Math.min(current + 1, stdSizes.length - 1);
+            input.value = labels[next];
+            input.dataset.size = stdSizes[next];
+          };
+
+          document.getElementById('decreaseSize').onclick = () => {
+            const input = document.getElementById('sizeInput');
+            const stdSizes = [200, 350, 500];
+            const labels = ['Compact', 'Average', 'Spacious'];
+            let current = stdSizes.indexOf(parseInt(input.dataset.size));
+            if (current === -1) current = stdSizes.indexOf(clickedRoom.value);
+            let prev = Math.max(current - 1, 0);
+            input.value = labels[prev];
+            input.dataset.size = stdSizes[prev];
+          };
+
+          document.getElementById('saveFeatures').onclick = () => {
+            const newSize = parseInt(document.getElementById('sizeInput').dataset.size || clickedRoom.value);
+            if (!isNaN(newSize) && newSize > 0) clickedRoom.value = newSize;
+            const checkboxes = modal.querySelectorAll('input[type=checkbox]:checked');
+            const selected = [...checkboxes]
+              .filter(cb => cb.value && cb.id !== 'customFeatureToggle')
+              .map(cb => cb.value);
+            const customInput = document.getElementById('customFeature').value.trim();
+const customChecked = document.getElementById('customFeatureToggle').checked;
+if (customInput && customChecked) selected.push(customInput);
+            clickedRoom.features = selected;
+            modal.remove();
+            updateTreemap();
+          };
+        });
+      });
+    }
+
+    updateTreemap();
+  </script>
+</body>
+</html>
