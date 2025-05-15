@@ -171,6 +171,7 @@ rooms.push({ name: finalName, parent, value: size, features: [] });
           '<label><input type="checkbox" id="customFeatureToggle"> <input id="customFeature" placeholder="Add custom feature..." style="padding: 6px; width: 80%; background: #2a2a2a; color: white; border: none; border-radius: 4px;"></label>';
 
           const oldModal = document.getElementById('featureModal');
+          document.body.style.height = '100vh'; // reset zoom on modal close
           if (oldModal) oldModal.remove();
 
           const modal = document.createElement('div');
@@ -194,6 +195,7 @@ rooms.push({ name: finalName, parent, value: size, features: [] });
             <button id="closeModal">Cancel</button>
           `;
           document.body.appendChild(modal);
+          document.body.style.height = 'auto'; // allow resize for keyboard
 
           document.getElementById('closeModal').onclick = () => {
             modal.remove();
